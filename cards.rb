@@ -3,12 +3,12 @@ V=Regexp.new(/(?<s>(#{S[:s]}|#{S[:c]}|#{S[:h]}|#{S[:d]}|A|B))(?<v>(\d\d?|[AJQKX]
 M={S[:c]=>0,S[:d]=>13,S[:h]=>26,S[:s]=>39,"A"=>1,"J"=>11,"Q"=>12,"K"=>13}
 I={1=>"A",11=>"J",12=>"Q",13=>"K"}
 def i2c(i)
-  if i > M[S[:c]] then s = :c end
-  if i > M[S[:d]] then s = :d end
-  if i > M[S[:h]] then s = :h end
-  if i > M[S[:s]] then s = :s end
-  i -= M[S[s]]
-  v = (I.key?(i) ? I[i] : i)
+  s=:c if i>M[S[:c]]
+  s=:d if i>M[S[:d]]
+  s=:h if i>M[S[:h]]
+  s=:s if i>M[S[:s]]
+  i-=M[S[s]]
+  v=(I.key?(i) ? I[i] : i)
   "#{S[s]}#{v}"
 end
 def c2i(c)
@@ -17,82 +17,69 @@ def c2i(c)
     end
   end
 end
-def prp(i)
+def pr(i)
   d = i.split /\s+/
-  if d.length!=54 then raise("Bad d") end
+  raise("Bad d") if d.length!=54
   d.collect {|c| c2i c}
 end
 def md(d,c)
-  i=d.find_index c
+  i=d.index c
   if i!=53
     d[i],d[i + 1]=d[i+1],d[i]
     return d
   else
-    return d.reverse.rotate.reverse
+    return [d[-1]]+d[0...-1]
   end
 end
 def tc(d)
-  f,l = d.find_index('A'),d.find_index('B')
-  f,l=(f>l ? [l,f] : [f,l])
-  a=d.shift f
-  b=d.reverse!.shift(53-l)
-  return b.reverse+d.reverse+a
+  f,l = d.index('A'),d.index('B')
+  f,l=l,f if f>l
+  return [d[(l+1)..-1],d[f..l],d[0...f]].flatten
 end
 def cc(d)
-  if !d[-1].is_a? Integer then return d end
+  return d if d[-1].is_a? String
   l=d.pop
-  f=d.shift(l)
+  f=d.shift(l-1)
   return d+f+[l]
 end
-def kc(d)
-  v={'A'=>53,'B'=>54};
-  c=v.key?(d[0]) ? d[0] : v[d[0]]
-  d[c]
-end
-def ks1(d)
+def ks(d)
   d=md(d,'A')
   d=md(d,'B')
   d=md(d,'B')
   d=tc(d)
   d=cc(d)
-  c=kc(d)
-  if !c.is_a? Integer then c,d = ks1(d) end
-  return c,d
+  c=d[d[0].is_a?(Integer) ? d[0] : 53]
+  c,d = ks(d) if c.is_a? String
+  return c%26,d
 end
-def ks5(d)
-  ks=Array.new(5,nil)
-  ks[0],d = ks1 d
-  ks[1],d = ks1 d
-  ks[2],d = ks1 d
-  ks[3],d = ks1 d
-  ks[4],d = ks1 d
-  return ks,d
+def mod(c)
+  return c-26 if c>26
+  return c+26 if c<1
+  return c
 end
 def go(d,i,e)
-  i=i.gsub(/[^a-zA-Z]/,'').upcase.split(/(.{5})/).reject {|e| e==""}
-  i[-1]=i[-1].ljust(5,'X')
-  i.collect! do |s|
-    q=s.split(//);k,d=ks5 d
-    q.collect! do |c|
-      c=c.ord-64
-      if e then c=(c+k.shift)%26 else c=(c-k.shift)%26 end
-      (c+64).chr
-    end
-    q.join
+  i=i.gsub(/[^a-zA-Z]/,'').upcase
+  i=i.ljust((i.length/5+1)*5, 'X') if i.length%5!=0
+  o = ""
+  i.each_byte do |c|
+    k,d=ks d
+    if e then n=(c-64+k)%26 else n=(c-64-k)%26 end
+    n=26 if n==0
+    o<<(n+64).chr
   end
-  puts i.join(' ')
+  puts o.split(/(.{5})/).reject {|e| e==''}.join(' ')
 end
 def cr
-  d = (1..52).to_a
+  d=(1..52).to_a
   d.collect! {|i| i2c i}
-  d += ['AX', 'BX']
+  d+=['AX','BX']
   puts d.shuffle.join ' '
 end
 def gn
   print("d> ")
-  d=prp(STDIN.gets.chomp)
+  d=pr(STDIN.gets.chomp)
   print "t> "
   text=STDIN.gets.chomp
   go d,text,ARGV.length>0
 end
-if ARGV[0]=="shuffle" cr;exit else gn;exit end
+if ARGV[0]=="shuffle" then cr;exit else gn;exit end
