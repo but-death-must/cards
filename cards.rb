@@ -43,11 +43,7 @@ def cc(d)
   return d+f+[l]
 end
 def ks(d)
-  d=md(d,'A')
-  d=md(d,'B')
-  d=md(d,'B')
-  d=tc(d)
-  d=cc(d)
+  d=cc(tc(md(md(md(d,'A'),'B'),'B')))
   c=d[d[0].is_a?(Integer) ? d[0] : 53]
   c,d = ks(d) if c.is_a? String
   return c%26,d
